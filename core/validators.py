@@ -9,6 +9,9 @@ from django.core.exceptions import ValidationError
 
 class AbstractValidator(ABC):
 
+    def __call__(self, *args, **kwargs):
+        self.execute(*args, **kwargs)
+
     @abstractmethod
     def execute(self, *args, **kwargs) -> Any:
         pass
@@ -23,7 +26,7 @@ class ObjectExistValidator(AbstractValidator):
         self._error_message = error_message
 
     def execute(self, author_id):
-        if not self._check_exist_by_id(author_id):
+        if not self._check_exist_by_id.execute(author_id):
             raise ValidationError(self._error_message)
 
 
@@ -37,5 +40,5 @@ class ObjectNotExistValidator(AbstractValidator):
         self._obj_id = obj_id
 
     def execute(self, **context):
-        if self._check_exist(**context, obj_id=self._obj_id):
+        if self._check_exist.execute(**context, obj_id=self._obj_id):
             raise ValidationError(self._error_message)

@@ -23,12 +23,10 @@ class IServiceExecutable(ABC):
         pass
 
     @property
-    @abstractmethod
     def success(self) -> Optional[bool]:
         return self._success
 
     @property
-    @abstractmethod
     def errors(self) -> Any:
         return self._errors
 
@@ -40,7 +38,7 @@ class AbstractService(IServiceExecutable, ABC):
         self,
         validator: Optional[AbstractValidator] = None,
         repo: Optional[AbstractRepository] = None,
-        form: Optional[AbstractForm] = None,
+        form: Optional[ABC] = None,
         logic: Optional[AbstractLogic] = None,
         serializer: Optional[AbstractSerializer] = None,
         call_back: Optional[IServiceExecutable] = None,
@@ -53,9 +51,6 @@ class AbstractService(IServiceExecutable, ABC):
         self._serializer = serializer
         self._call_back = call_back
         self._on_error = on_error
-
-        if not self._repo or not self._logic:
-            raise TypeError('repo or logic required')
 
 
 class RepoService(AbstractService, ABC):
