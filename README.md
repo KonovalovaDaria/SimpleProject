@@ -13,7 +13,7 @@ python manage.py runserver
 
 1. созание автора
 ```commandline
-curl -X PUT "127.0.0.1:8000/authors/" -d '{"first_name": "first_name", "last_name": "last_name", "birthday": "2022-01-01"}'
+curl -X PUT "127.0.0.1:8000/author/" -d '{"first_name": "first_name", "last_name": "last_name", "birthday": "2022-01-01"}'
 ```
 
 2. обновление данных автора
