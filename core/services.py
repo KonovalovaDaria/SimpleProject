@@ -4,7 +4,7 @@
 Второй работает через форму.
 """
 from abc import ABC, abstractmethod
-from typing import Any, Optional
+from typing import Any, Optional, TypeVar, Generic
 
 from django.core.exceptions import ValidationError
 
@@ -14,9 +14,14 @@ from core.serializers import AbstractSerializer
 from core.validators import AbstractValidator
 
 
+CONTEXT = TypeVar('CONTEXT')
+DATASTRUCTURE = TypeVar('DATASTRUCTURE')
+
+
 class IServiceExecutable(ABC):
     _success = None
     _errors = None
+    _result = None
 
     @abstractmethod
     def execute(self, context: Any, **kwargs) -> Any:
@@ -53,9 +58,19 @@ class AbstractService(IServiceExecutable, ABC):
         self._on_error = on_error
 
 
-class RepoService(AbstractService, ABC):
+class RepoService(Generic[CONTEXT, DATASTRUCTURE], AbstractService, ABC):
 
-    __slots__ = ('_validator', '_repo', '_serializer', '_call_back', '_on_error')
+    __slots__ = (
+        '_success',
+        '_errors',
+        '_result',
+        '_validator',
+        '_repo',
+        '_serializer',
+        '_call_back',
+        '_on_error',
+        '_parent',
+    )
 
     def __init__(self, *args, **kwargs):
         super(RepoService, self).__init__(*args, **kwargs)
@@ -63,24 +78,39 @@ class RepoService(AbstractService, ABC):
         if not self._repo:
             raise TypeError('repo is required')
 
-    def execute(self, context, **kwargs):
+    def execute(self, context: CONTEXT, **kwargs) -> DATASTRUCTURE:
         try:
             if self._validator:
                 self._validator.execute(**context)
         except ValidationError as ex:
             self._success = False
             self._errors = ex.messages
+            if self._on_error:
+                self._on_error.execute(context=context, **kwargs)
         else:
             self._success = True
-            result = self._repo.execute(**context)
+            self._errors = None
+            self._result = self._repo.execute(**context)
             if self._serializer:
-                return self._serializer.execute(result)
-            return result
+                self._result = self._serializer.execute(self._result)
+            if self._call_back:
+                self._call_back.execute(context=self._result, **kwargs)
+            return self._result
 
 
-class LogicService(AbstractService, ABC):
+class LogicService(Generic[CONTEXT, DATASTRUCTURE], AbstractService, ABC):
 
-    __slots__ = ('_validator', '_logic', '_serializer', '_call_back', '_on_error')
+    __slots__ = (
+        '_success',
+        '_errors',
+        '_result',
+        '_validator',
+        '_logic',
+        '_serializer',
+        '_call_back',
+        '_on_error',
+        '_parent',
+    )
 
     def __init__(self, *args, **kwargs):
         super(LogicService, self).__init__(*args, **kwargs)
@@ -88,24 +118,39 @@ class LogicService(AbstractService, ABC):
         if not self._logic:
             raise TypeError('logic is required')
 
-    def execute(self, context, **kwargs):
+    def execute(self, context: CONTEXT, **kwargs) -> DATASTRUCTURE:
         try:
             if self._validator:
                 self._validator.execute(**context)
         except ValidationError as ex:
             self._success = False
             self._errors = ex.messages
+            if self._on_error:
+                self._on_error.execute(context=context, **kwargs)
         else:
             self._success = True
-            result = self._logic.execute(**context)
+            self._errors = None
+            self._result = self._logic.execute(context=context)
             if self._serializer:
-                return self._serializer.execute(result)
-            return result
+                self._result = self._serializer.execute(self._result)
+            if self._call_back:
+                self._call_back.execute(context=self._result, **kwargs)
+            return self._result
 
 
-class FormService(AbstractService, ABC):
+class FormService(Generic[CONTEXT, DATASTRUCTURE], AbstractService, ABC):
 
-    __slots__ = ('_validator', '_form', '_serializer', '_call_back', '_on_error')
+    __slots__ = (
+        '_success',
+        '_errors',
+        '_result',
+        '_validator',
+        '_form',
+        '_serializer',
+        '_call_back',
+        '_on_error',
+        '_parent',
+    )
 
     def __init__(self, *args, **kwargs):
         super(FormService, self).__init__(*args, **kwargs)
@@ -113,13 +158,18 @@ class FormService(AbstractService, ABC):
         if not self._form:
             raise TypeError('form required')
 
-    def execute(self, **kwargs):
+    def execute(self, **kwargs) -> DATASTRUCTURE:
         if self._form.is_valid():
             self._success = True
-            result = self._form.save()
+            self._errors = None
+            self._result = self._form.save()
             if self._serializer:
-                return self._serializer.execute(result)
-            return result
+                self._result = self._serializer.execute(self._result)
+            if self._call_back:
+                self._call_back.execute(context=self._result, **kwargs)
+            return self._result
         else:
             self._success = False
             self._errors = self._form.errors
+            if self._on_error:
+                self._on_error.execute(context=self._form.data, **kwargs)

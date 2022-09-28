@@ -11,8 +11,9 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.urls import reverse
 
+from authors.dto import AuthorDto, AuthorObjDto
 from authors.forms import AuthorForm
-from authors.logic import GenerateReportLogic
+from authors.logic import GenerateReportLogic, CallBackOnCreateLogic, OnErrorCreateLogic
 from authors.serializers import ObjectSerializer, QuerysetSerializer
 from authors.repositories import (
     GetAuthorRepo,
@@ -51,14 +52,18 @@ class Author(View):
         # форме говорим с помощью какого валидатора валидировать
         form = AuthorForm(context, validate_unique_author=validate_unique_author)
 
+        callback = LogicService[AuthorObjDto, AuthorObjDto](logic=CallBackOnCreateLogic())
+        on_error = LogicService[AuthorDto, AuthorDto](logic=OnErrorCreateLogic())
+
         # сервису говорим с помощью какой формы производить обработку и как сериализовать выходные данные
-        service = FormService(form=form, serializer=ObjectSerializer())
+        service = FormService[AuthorDto, AuthorObjDto](
+            form=form, serializer=ObjectSerializer(), call_back=callback, on_error=on_error
+        )
         result = service.execute()
 
         if service.success:
             response = JsonResponse({'success': True, 'result': result}, status=201)
-            author_id = json.loads(result)[0]['pk']
-            response['Location'] = reverse('authors:author', kwargs={'author_id': author_id})
+            response['Location'] = reverse('authors:author', kwargs={'author_id': result['id']})
             return response
         else:
             return JsonResponse({'success': False, 'errors': service.errors}, status=400)
